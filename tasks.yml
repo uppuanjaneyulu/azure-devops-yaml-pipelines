@@ -1,0 +1,131 @@
+# Conditionals and Custom Scripts
+- task: Bash@3  
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo "Hello, World!"
+---
+#  run power shell script
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "Hello, World!"
+---
+- task: Checkout@1
+  inputs:
+    clean: true  # Optional: Clean the repository before checkout
+---
+steps:
+  - task: Checkout@1
+    inputs:
+      clean: true
+      fetchDepth: 1
+      repository: 'MyGitHubRepo'  # Name of the GitHub service connection
+    displayName: 'Checkout GitHub Repository'
+
+---
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'build'
+    projects: '**/*.csproj'  # Path to your .NET project
+---
+- task: Docker@2
+  inputs:
+    containerRegistry: '$(dockerRegistryServiceConnection)'  # Docker registry service connection
+    repository: 'myapp'
+    command: 'build'
+    Dockerfile: '**/Dockerfile'
+    buildContext: '.'
+    tags: 'latest'
+---
+- task: Maven@3
+  inputs:
+    mavenPomFile: 'pom.xml'
+    goals: 'clean install'
+    options: '-X'
+---
+- task: Npm@1
+  inputs:
+    command: 'install'
+    workingDir: '$(Build.SourcesDirectory)'  # Location of package.json
+---
+# Step 2: Login to Azure Container Registry (ACR)
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'Your Azure Subscription'  # Azure Service Connection in Azure DevOps
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az acr login --name <yourACRName>  # Login to your ACR using the Azure CLI
+---
+- task: SendEmail@1
+  inputs:
+    to: 'someone@example.com'
+    subject: 'Pipeline completed'
+    body: 'The pipeline has finished successfully.'
+---
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'MyServiceConnection'  # Azure service connection
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      terraform init
+      terraform apply -auto-approve
+  displayName: 'Run Terraform'
+---
+ # Use AWS CLI to interact with AWS
+- task: AmazonWebServices@1
+  inputs:
+    awsCredentials: 'MyAWSConnection'  # The AWS service connection name you created in Azure DevOps
+    regionName: 'us-west-2'  # Specify the AWS region
+    command: 's3'
+    arguments: 'cp myfile.txt s3://mybucket/myfile.txt'
+  displayName: 'Copy File to S3'
+---
+# Run AWS CLI command to describe EC2 instances
+- task: AmazonWebServices@1
+  inputs:
+    awsCredentials: 'MyAWSConnection'  # The AWS service connection name
+    regionName: 'us-west-2'
+    command: 'ec2'
+    arguments: 'describe-instances'
+  displayName: 'Describe EC2 Instances'
+---
+# Stop an EC2 instance
+- task: AmazonEC2@1
+  inputs:
+    awsCredentials: 'MyAWSConnection'  # AWS service connection name
+    regionName: 'us-west-2'
+    instanceIds: 'i-0123456789abcdef0'
+    action: 'stopInstances'
+  displayName: 'Stop EC2 Instance'
+---
+# to copy files to the s3 bucket
+- task: AmazonWebServices@1
+  inputs:
+    awsCredentials: 'MyAWSConnection'  # AWS service connection name
+    regionName: 'us-west-2'  # AWS region
+    command: 's3'
+    arguments: 'cp $(Build.SourcesDirectory)/src/* s3://mybucket/myfolder/ --recursive'
+  displayName: 'Copy files to AWS S3'
+---
+# to copy to the azure blob storage
+- task: AzureFileCopy@4
+  inputs:
+    SourcePath: '$(Build.SourcesDirectory)/src/*'  # Local source path
+    azureSubscription: 'MyAzureConnection'  # Azure service connection
+    Destination: 'AzureBlob'  # Destination type (Azure Blob)
+    storage: 'MyStorageAccount'  # Azure Storage Account name
+    ContainerName: 'mycontainer'  # Blob container name
+    BlobPrefix: 'files/'  # Blob prefix (optional)
+  displayName: 'Copy files to Azure Blob Storage'
+---
+# to copy the files from local to remote
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(Build.SourcesDirectory)/src'  # Source directory
+    Contents: '**/*'  # All files in the source folder
+    TargetFolder: '$(Build.ArtifactStagingDirectory)/output'  # Target directory
+  displayName: 'Copy files to output directory'
