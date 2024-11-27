@@ -1,0 +1,80 @@
+trigger:
+  - master
+
+variables:
+  name: anjan
+  purpose: testing
+
+pool:
+  name: 'mypool'
+
+stages:
+  - stage: install
+    displayName: 'This is for installing basic packages'
+    jobs:
+      - job: this_to_install_packages
+        displayName: 'This job installs packages'
+        steps:
+          - checkout: self  # Check out the repository
+          # Install basic packages
+          - script: |
+              sudo pwd
+              sudo apt update
+              sudo apt install -y unzip jq net-tools
+              rm $(Build.SourcesDirectory)/File.txt
+            displayName: 'Install Basic Packages'
+
+          # Copy files to the target directory
+          - task: CopyFiles@2
+            inputs:
+              SourceFolder: '$(Build.SourcesDirectory)'  # Use the build source directory
+              Contents: 'File.txt'  # Specific file to copy
+              TargetFolder: '/home/ubuntu/'  # Directory where the file will be copied
+            displayName: 'Copy File.txt to Target Directory'
+  - stage: build_stage
+    displayName: this is for build the image
+    jobs:
+      - job: this_for_build_image
+        displayName: 'this to build image'
+        steps:
+          - checkout: self
+          - script: |
+              if ! aws --version | grep -q "aws-cli/2"; then
+                  echo "AWS CLI v2 not found, installing..."
+                  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                  unzip awscliv2.zip
+                  sudo ./aws/install
+              else
+                  echo "AWS CLI v2 is already installed"
+              fi
+            displayName: 'Install AWS CLI if not installed'
+          - script: |
+              if ! command -v az &> /dev/null
+              then
+                  echo "Azure CLI not found, installing..."
+                  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+              else
+                  echo "Azure CLI is already installed"
+              fi
+            displayName: 'Install Azure CLI if not installed'
+          # - task: AWSCLI@1
+          #   inputs:
+          #     awsCredentials: 'myawsconnection'  # service connection name
+          #     regionName: 'us-east-1'
+          #     arguments: 's3 cp $(Build.SourcesDirectory)/File.txt s3://mybucket/myfolder/File.txt'
+          #   displayName: 'Copy file to AWS S3 to folder'
+  - stage: clean_workspace
+    displayName: 'Clean Workspace'
+    jobs:
+    - job: clean_workspace
+      displayName: 'Clean Workspace'
+      steps:
+      - checkout: none
+      - task: DeleteFiles@1
+        inputs:
+          SourceFolder: '$(Build.SourcesDirectory)'
+          Contents: '**'
+          CleanTargetFolder: true
+      - script: |
+          ls -R
+        displayName: 'List Workspace Contents'

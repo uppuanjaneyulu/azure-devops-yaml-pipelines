@@ -1,0 +1,67 @@
+trigger:
+  - master
+
+variables:
+  name: anjan
+  purpose: testing
+  dockerHubUser: 'your-dockerhub-username'
+  dockerHubPassword: '$(dockerHubPassword)'  # Set this secret in the Azure Pipeline UI
+  dockerHubRegistry: 'docker.io'
+  imageName: 'your-image-name'
+  tag: '$(Build.BuildId)'
+
+pool:
+  name: 'mypool'
+
+stages:
+  - stage: Install_docker_build
+    displayName: 'this is for build stage of docker file'
+    jobs:
+      - job: this_is_for_build
+        displayName: 'This is for build stage'
+        steps:
+          - checkout: self
+          - task: DockerInstaller@0
+            displayName: 'Install Docker'
+          - task: DockerLogin@0  # Login to Docker Hub
+            displayName: 'Login to Docker Hub'
+            inputs:
+              containerRegistry: $(dockerHubRegistry)
+              username: $(dockerHubUser)
+              password: $(dockerHubPassword)
+          - task: DockerBuild@0
+            displayName: 'Build Docker Image'
+            inputs:
+              repository: $(dockerHubUser)/$(imageName)  # Docker Hub repository
+              dockerfile: $(dockerfilePath)
+              tags: $(tag)
+
+  - stage: 
+    displayName: 'This is for push stage'
+    jobs:
+      - job: this_push_registry
+        displayName: 'This job for push registry'
+        steps:
+          - task: DockerPush@0
+            displayName: 'Push Docker Image'
+            inputs:
+              repository: $(dockerHubUser)/$(imageName)
+              tags: $(tag)
+
+  - stage: Cleanup
+    displayName: 'Agent Cleanup'
+    jobs:
+    - job: CleanupJob
+      displayName: 'Cleanup Agent Environment'
+      steps:
+        - script: |
+            echo "Cleaning up Docker images, containers, and volumes"
+            docker system prune -af  
+        # Removes unused Docker data (images, containers, volumes, etc.)
+          displayName: 'Cleanup Docker Environment'
+
+        - script: |
+            echo "Clearing build agent workspace"
+            rm -rf $(Build.SourcesDirectory)  
+        # Removes the workspace files after the build
+          displayName: 'Clear Workspace Files'
